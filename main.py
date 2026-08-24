@@ -7,6 +7,7 @@ on the Amazon deforestation dataset.
 import json
 import logging
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader, random_split
 from torchinfo import summary
@@ -50,7 +51,16 @@ def main():
 
     args = parse_args()
     config = load_config(args.config)
+    config = load_config("config.yaml")
     logger.info("Loaded config:\n%s", json.dumps(config, indent=2))
+
+    # Set random seeds for reproducibility
+    seed = config["seed"]
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
     # get config variables
     device = get_device(config["device"])
@@ -75,8 +85,9 @@ def main():
     logger.info("Dataset target shape: %s", amazon_dataset[0][1].shape)
 
     # split dataset
+    generator = torch.Generator().manual_seed(seed)
     train_data, val_data = random_split(
-        amazon_dataset, [(1 - val_ratio), val_ratio]
+        amazon_dataset, [(1 - val_ratio), val_ratio], generator=generator
     )
 
     # Before creating your DataLoader:
@@ -181,7 +192,8 @@ def main():
     # )
     
     # Log comprehensive training summary
-    # log_training_summary(train_losses, val_losses, val_metrics, train_metrics)
+    # log_training_summary(train_losses, val_losses, val_metrics, 
+    #                      train_metrics)
     
     logger.info("%s Evaluation completed %s", 16 * "=", 16 * "=")
 

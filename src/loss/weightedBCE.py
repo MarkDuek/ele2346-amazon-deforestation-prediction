@@ -12,12 +12,13 @@ class WeightedBCEWithLogitsLoss(torch.nn.Module):
     A custom loss function that applies weighted binary cross entropy with
     logits to handle class imbalance in binary classification tasks. The loss
     is computed using a validity mask based on the target tensor, applying
-    different weights for valid and invalid targets.
+    different weights for valid and invalid targets. Can also handle class
+    imbalance with pos_weight.
 
     Args:
         config: Configuration dictionary containing loss parameters.
-            Expected to have a 'loss' key with 'weight' and 'invalid_weight'
-            subkeys.
+            Expected to have a 'loss' key with 'weight', 'invalid_weight',
+            and optionally 'pos_weight' subkeys.
     """
 
     def __init__(self, config: Dict[str, Any]):
@@ -28,10 +29,13 @@ class WeightedBCEWithLogitsLoss(torch.nn.Module):
             config: Configuration dictionary containing loss parameters.
                    Must contain config['loss']['weight'] for the loss weight
                    and config['loss']['invalid_weight'] for the invalid weight.
+                   Optionally can contain config['loss']['pos_weight'] for
+                   class imbalance handling.
         """
         super().__init__()
         self.weight = config["loss"]["weight"]
         self.invalid_weight = config["loss"]["invalid_weight"]
+        self.pos_weight = config["loss"].get("pos_weight", None)
 
     def forward(
         self,
@@ -51,6 +55,8 @@ class WeightedBCEWithLogitsLoss(torch.nn.Module):
             torch.Tensor: Computed weighted binary cross entropy loss scalar.
                          Uses self.weight for valid targets (target > 0) and
                          self.invalid_weight for invalid targets (target <= 0).
+                         If pos_weight is specified, also applies class-level
+                         weighting for positive examples.
         """
         # compute validity mask
         validity_mask = (target > 0.0).float()
@@ -60,9 +66,16 @@ class WeightedBCEWithLogitsLoss(torch.nn.Module):
             validity_mask == 1, self.weight, self.invalid_weight
         )
 
+        # prepare pos_weight if specified
+        pos_weight = None
+        if self.pos_weight is not None:
+            pos_weight = torch.tensor(
+                self.pos_weight, device=input.device, dtype=input.dtype
+            )
+
         # compute loss
         loss = torch.nn.functional.binary_cross_entropy_with_logits(
-            input, target, weight=weights, pos_weight= torch.tensor(100, device=input.device, dtype=input.dtype)
+            input, target, weight=weights, pos_weight=pos_weight
         )
 
         return loss

@@ -101,19 +101,17 @@ def calculate_deforestation_area(masks):
     return deforestation_areas
 
 
-def sort_patches_by_deforestation_area(patches, masks, valid_indices):
+def sort_patches_by_deforestation_area(masks, valid_indices):
     """Sort patches by deforestation area in descending order.
     
     Args:
-        patches: Array of patches with shape (N, C, H, W)
         masks: Array of deforestation masks with shape (N, H, W)
         valid_indices: List of indices with deforestation
         
     Returns:
-        tuple: (sorted_patches, sorted_masks, sorted_indices, sorted_areas)
+        tuple: (sorted_masks, sorted_indices, sorted_areas)
     """
     # Only consider patches with deforestation
-    valid_patches = patches[valid_indices]
     valid_masks = masks[valid_indices]
     
     # Calculate deforestation areas
@@ -123,7 +121,6 @@ def sort_patches_by_deforestation_area(patches, masks, valid_indices):
     sort_indices = np.argsort(deforestation_areas)[::-1]
     
     # Sort all arrays using the indices
-    sorted_patches = valid_patches[sort_indices]
     sorted_masks = valid_masks[sort_indices]
     sorted_areas = deforestation_areas[sort_indices]
     
@@ -133,73 +130,49 @@ def sort_patches_by_deforestation_area(patches, masks, valid_indices):
     print("Sorted patches by deforestation area (descending):")
     print(f"Top 10 deforestation areas: {sorted_areas[:10]}")
     
-    return sorted_patches, sorted_masks, sorted_original_indices, sorted_areas
+    return sorted_masks, sorted_original_indices, sorted_areas
 
 
-def plot_top_patches(patches, masks, original_indices, areas, n_patches=4):
+def plot_top_patches(masks, original_indices, areas, n_patches=4):
     """Plot the top n patches with highest deforestation area.
     
     Args:
-        patches: Sorted patches array with shape (N, C, H, W)
         masks: Sorted deforestation masks array with shape (N, H, W)
         original_indices: Original indices of sorted patches
         areas: Sorted deforestation areas
         n_patches: Number of patches to plot
     """
-    # Create a figure with subplots for each patch
-    fig, axes = plt.subplots(n_patches, 3, figsize=(15, 5*n_patches))
+    # Set color scale maximum (same as plots.py)
+    vmax = 1.0
+    
+    # Create a figure with subplots for each patch (single column)
+    fig, axes = plt.subplots(n_patches, 1, figsize=(8, 5*n_patches))
     fig.suptitle('Top 4 Patches with Highest Deforestation Area',
                  fontsize=16, fontweight='bold')
+    
+    # Handle case where n_patches = 1
+    if n_patches == 1:
+        axes = [axes]
     
     for i in range(n_patches):
         patch_idx = original_indices[i]
         deforestation_area = areas[i]
-        
-        # Get the data for this patch
-        patch = patches[i]  # Shape: (C, H, W)
-        mask = masks[i]     # Shape: (H, W)
-        
-        # Extract RGB channels (assuming first 3 channels are RGB)
-        # If not RGB, we'll use the first 3 channels anyway
-        rgb_image = patch[:3, :, :].transpose(1, 2, 0)  # Shape: (H, W, 3)
-        
-        # Normalize RGB for display if needed
-        rgb_image = np.clip(rgb_image, 0, 1)
+        mask = masks[i]  # Shape: (H, W)
         
         # Calculate some statistics
         total_pixels = mask.size
         deforested_pixels = np.sum(mask > 0)
         deforestation_percentage = (deforested_pixels / total_pixels) * 100
         
-        # Plot RGB image
-        row = i
-        axes[row, 0].imshow(rgb_image)
-        axes[row, 0].set_title(f'RGB Image\n(Patch {patch_idx})')
-        axes[row, 0].axis('off')
+        # Plot target (same style as plots.py)
+        im = axes[i].imshow(mask, cmap='coolwarm', vmin=0, vmax=vmax)
+        axes[i].set_title(f'Ground Truth\n(Target Area: {deforestation_area:.0f})')
+        axes[i].axis('off')
+        plt.colorbar(im, ax=axes[i], fraction=0.046, pad=0.04)
         
-        # Plot deforestation mask
-        im2 = axes[row, 1].imshow(mask, cmap='Reds', vmin=0, vmax=1)
-        axes[row, 1].set_title(f'Deforestation Mask\n(Area: '
-                               f'{deforestation_area:.0f})')
-        axes[row, 1].axis('off')
-        plt.colorbar(im2, ax=axes[row, 1], fraction=0.046, pad=0.04)
-        
-        # Plot overlay
-        overlay = rgb_image.copy()
-        red_mask = mask > 0
-        overlay[red_mask, 0] = 1.0  # Make deforested areas red
-        overlay[red_mask, 1] = 0.0
-        overlay[red_mask, 2] = 0.0
-        
-        axes[row, 2].imshow(overlay)
-        axes[row, 2].set_title(f'Overlay\n'
-                               f'({deforestation_percentage:.1f}% deforested)')
-        axes[row, 2].axis('off')
-        
-        # Add patch info as text
+        # Add patch info as text (same style as plots.py)
         patch_info = (f"Patch {patch_idx}: Deforestation Area = "
-                      f"{deforestation_area:.0f} pixels "
-                      f"({deforestation_percentage:.1f}%)")
+                      f"{deforestation_area:.0f}")
         fig.text(0.02, 0.95 - i*0.23, patch_info, fontsize=10,
                  fontweight='bold')
     
@@ -214,8 +187,10 @@ def main():
         # Load configuration
         config = load_config()
         
-        # Path to input patches file
+        # Fix path resolution - add .. prefix when running from notebooks/
         patches_path = config["data"]["h5_paths"]["input"]
+        if not patches_path.startswith('/'):  # If it's a relative path
+            patches_path = os.path.join('..', patches_path)
         
         # Load patches
         patches, time_indices, num_patches_per_time = load_patches_from_h5(
@@ -247,14 +222,14 @@ def main():
         print(f"  Median area: {np.median(all_deforestation_areas):.2f}")
         
         # Sort by deforestation area
-        (sorted_patches, sorted_masks, sorted_indices,
+        (sorted_masks, sorted_indices,
          sorted_areas) = sort_patches_by_deforestation_area(
-            patches, masks, valid_indices
+            masks, valid_indices
         )
         
         # Debug: Check individual patch statistics
         print("\n=== TOP 4 PATCHES ANALYSIS ===")
-        for i in range(min(4, len(sorted_patches))):
+        for i in range(min(4, len(sorted_masks))):
             patch_idx = sorted_indices[i]
             mask = sorted_masks[i]
             
@@ -267,8 +242,8 @@ def main():
         
         # Plot top 4 patches
         plot_top_patches(
-            sorted_patches, sorted_masks, sorted_indices, sorted_areas, 
-            n_patches=min(4, len(sorted_patches))
+            sorted_masks, sorted_indices, sorted_areas, 
+            n_patches=min(4, len(sorted_masks))
         )
         
     except FileNotFoundError as e:

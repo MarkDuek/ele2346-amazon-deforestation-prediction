@@ -26,9 +26,9 @@ def load_predictions_from_h5(h5_file_path: str):
         )
     
     with h5py.File(h5_file_path, 'r') as f:
-        predictions = f['predictions'][:]
-        binary_predictions = f['binary_predictions'][:]
-        targets = f['targets'][:]
+        predictions = np.array(f['predictions'][:])
+        binary_predictions = np.array(f['binary_predictions'][:])
+        targets = np.array(f['targets'][:])
         
         # Load metadata
         metadata = {}
@@ -102,17 +102,30 @@ def sort_by_deforestation_area(predictions, binary_predictions, targets):
             sorted_targets, sorted_indices)
 
 
-def plot_top_patches(predictions, binary_predictions, targets,
-                     sorted_indices, n_patches=4):
-    """Plot the top n patches with highest deforestation area.
+def plot_patches(predictions, binary_predictions, targets,
+                 sorted_indices=None, patch_indices=None, n_patches=4):
+    """Plot specified patches or top n patches with highest deforestation area.
     
     Args:
-        predictions: Sorted predictions array
-        binary_predictions: Sorted binary predictions array
-        targets: Sorted targets array
-        sorted_indices: Original indices of sorted patches
-        n_patches: Number of patches to plot
+        predictions: Predictions array
+        binary_predictions: Binary predictions array
+        targets: Targets array
+        sorted_indices: Original indices of sorted patches (for top-n mode)
+        patch_indices: Specific patch indices to plot (overrides n_patches)
+        n_patches: Number of top patches to plot (ignored if patch_indices provided)
     """
+    # Determine which patches to plot
+    if patch_indices is not None:
+        # Use specific patch indices
+        n_patches = len(patch_indices)
+        title = f'Selected {n_patches} Patches'
+    else:
+        # Use top n patches by deforestation area
+        if sorted_indices is None:
+            raise ValueError("Must provide either patch_indices or " +
+                           "sorted_indices")
+        title = f'Top {n_patches} Patches with Highest Deforestation Area'
+    
     # Set color scale maximum
     vmax = 1.0
     
@@ -121,17 +134,30 @@ def plot_top_patches(predictions, binary_predictions, targets,
     
     # Create a figure with subplots for each patch
     fig, axes = plt.subplots(n_patches, 3, figsize=(15, 5*n_patches))
-    fig.suptitle('Top 4 Patches with Highest Deforestation Area',
-                 fontsize=16, fontweight='bold')
+    fig.suptitle(title, fontsize=16, fontweight='bold')
     
     for i in range(n_patches):
-        patch_idx = sorted_indices[i]
-        deforestation_area = deforestation_areas[i]
+        # Get the actual patch index
+        if patch_indices is not None:
+            patch_idx = patch_indices[i]
+            data_idx = patch_idx  # Use patch index for data access
+        else:
+            patch_idx = sorted_indices[i]
+            data_idx = i  # Use sorted order for data access
+            
+        deforestation_area = deforestation_areas[data_idx]
         
         # Get the data for this patch
-        prediction = predictions[i]
-        binary_prediction = binary_predictions[i]
-        target = targets[i]
+        if patch_indices is not None:
+            # Use the actual patch index for data access
+            prediction = predictions[patch_idx]
+            binary_prediction = binary_predictions[patch_idx]
+            target = targets[patch_idx]
+        else:
+            # Use the sorted order for data access
+            prediction = predictions[i]
+            binary_prediction = binary_predictions[i]
+            target = targets[i]
         
         # Handle dimensions - squeeze out single dimensions
         if prediction.ndim == 4:  # (1, 1, H, W)
@@ -150,7 +176,8 @@ def plot_top_patches(predictions, binary_predictions, targets,
         
         # Plot raw prediction
         row = i
-        im1 = axes[row, 0].imshow(prediction, cmap='coolwarm', vmin=0, vmax=vmax)
+        im1 = axes[row, 0].imshow(prediction, cmap='coolwarm', vmin=0, 
+                                  vmax=vmax)
         axes[row, 0].set_title(f'Raw Prediction\n(Patch {patch_idx})')
         axes[row, 0].axis('off')
         plt.colorbar(im1, ax=axes[row, 0], fraction=0.046, pad=0.04)
@@ -172,21 +199,22 @@ def plot_top_patches(predictions, binary_predictions, targets,
         axes[row, 2].axis('off')
         plt.colorbar(im3, ax=axes[row, 2], fraction=0.046, pad=0.04)
         
-        # # Add patch info as text
-        # patch_info = (f"Patch {patch_idx}: Deforestation Area = "
-        #               f"{deforestation_area:.0f}, Accuracy = {accuracy:.3f}")
-        # fig.text(0.02, 0.95 - i*0.23, patch_info, fontsize=10,
-        #          fontweight='bold')
+        # Skip patch info text
     
     plt.tight_layout()
     plt.subplots_adjust(top=0.95)
     plt.show()
 
 
-def main():
-    """Main function to load predictions and plot sorted patches."""
+def main(patch_indices=None):
+    """Main function to load predictions and plot sorted patches.
+    
+    Args:
+        patch_indices: List of specific patch indices to plot (e.g., [0, 5, 10, 15])
+                      If None, plots top 4 patches by deforestation area
+    """
     # Path to predictions file
-    predictions_path = "../results/predictions.h5"
+    predictions_path = "../results/predictions_baseline_w5.h5"
     
     try:
         # Load predictions
@@ -204,7 +232,7 @@ def main():
         
         # Calculate deforestation areas for all patches
         all_deforestation_areas = calculate_deforestation_area(targets)
-        print(f"\nDeforestation area statistics:")
+        print("\nDeforestation area statistics:")
         print(f"  Min area: {all_deforestation_areas.min()}")
         print(f"  Max area: {all_deforestation_areas.max()}")
         print(f"  Mean area: {all_deforestation_areas.mean():.2f}")
@@ -215,7 +243,8 @@ def main():
         full_patches = np.sum(all_deforestation_areas == targets[0].size)
         print(f"  Patches with 0 deforestation: {zero_patches}")
         print(f"  Patches with full deforestation: {full_patches}")
-        print(f"  Patches with partial deforestation: {len(targets) - zero_patches - full_patches}")
+        partial_patches = len(targets) - zero_patches - full_patches
+        print(f"  Patches with partial deforestation: {partial_patches}")
         
         # Show top 10 deforestation areas
         sorted_areas = np.sort(all_deforestation_areas)[::-1]
@@ -228,8 +257,14 @@ def main():
             predictions, binary_predictions, targets
         )
         
+        # Print top sorted patch indices
+        print("\nTop 20 patch indices (sorted by deforestation area):")
+        print(f"Indices: {sorted_indices[:20].tolist()}")
+        print(f"Top 10: {sorted_indices[:10].tolist()}")
+        print(f"Top 4: {sorted_indices[:4].tolist()}")
+        
         # Debug: Check individual patch statistics
-        print(f"\n=== TOP 4 PATCHES ANALYSIS ===")
+        print("\n=== TOP 4 PATCHES ANALYSIS ===")
         for i in range(4):
             patch_idx = sorted_indices[i]
             target_patch = sorted_targets[i]
@@ -243,11 +278,19 @@ def main():
             print(f"  Non-zero pixels: {np.sum(target_patch > 0)}")
             print(f"  Total pixels: {target_patch.size}")
         
-        # Plot top 4 patches
-        plot_top_patches(
-            sorted_predictions, sorted_binary_predictions, sorted_targets,
-            sorted_indices, n_patches=4
-        )
+        # Plot patches (either specific indices or top 4)
+        if patch_indices is not None:
+            # Plot specific patches
+            plot_patches(
+                predictions, binary_predictions, targets,
+                patch_indices=patch_indices
+            )
+        else:
+            # Plot top 4 patches by deforestation area
+            plot_patches(
+                sorted_predictions, sorted_binary_predictions, sorted_targets,
+                sorted_indices=sorted_indices, n_patches=4
+            )
         
     except FileNotFoundError as e:
         print(f"Error: {e}")
@@ -260,4 +303,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
