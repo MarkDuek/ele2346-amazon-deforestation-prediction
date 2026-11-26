@@ -6,7 +6,16 @@
 /memory_records
 /src/data/patches
 __pycache__/
+.venv/
+venv/
+.env
+.DS_Store
 .idea/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
 .coverage
-.pickle
 coverage.xml
+*.py[cod]
+*.pickle

@@ -1,27 +1,14 @@
-prepare:
-	@black .
-	@isort .
-	@mypy job
-	@pylint job
-	@flake8 job
-	@echo Good to Go!
+format:
+	@uv run black .
+	@uv run isort .
 
 check:
-	@black .
-	@isort .
-	@mypy src
-	@flake8 src
-	@pylint src
-	@echo Good to Go!
+	@uv run black --check .
+	@uv run isort --check-only .
+	@uv run pytest
 
 test:
-	@pytest --cov-report=term-missing --cov=src tests/
-
-test-cov:
-	@pytest --cov src tests/ --cov-report xml:coverage.xml
+	@uv run pytest
 
 install:
-	@pip install -r requirements.txt
-
-clean:
-	@rm -rf __pycache__
+	@uv sync --group dev
