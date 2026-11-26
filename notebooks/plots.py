@@ -1,22 +1,23 @@
 """Script to load predictions and plot patches sorted by deforestation area."""
 
-import sys
 import os
-import numpy as np
-import h5py
-import matplotlib.pyplot as plt
+import sys
 from pathlib import Path
 
+import h5py
+import matplotlib.pyplot as plt
+import numpy as np
+
 # Add src to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 def load_predictions_from_h5(h5_file_path: str):
     """Load predictions from HDF5 file.
-    
+
     Args:
         h5_file_path: Path to the predictions HDF5 file
-        
+
     Returns:
         tuple: (predictions, binary_predictions, targets, metadata)
     """
@@ -24,32 +25,32 @@ def load_predictions_from_h5(h5_file_path: str):
         raise FileNotFoundError(
             f"Predictions file not found at {h5_file_path}"
         )
-    
-    with h5py.File(h5_file_path, 'r') as f:
-        predictions = np.array(f['predictions'][:])
-        binary_predictions = np.array(f['binary_predictions'][:])
-        targets = np.array(f['targets'][:])
-        
+
+    with h5py.File(h5_file_path, "r") as f:
+        predictions = np.array(f["predictions"][:])
+        binary_predictions = np.array(f["binary_predictions"][:])
+        targets = np.array(f["targets"][:])
+
         # Load metadata
         metadata = {}
         for key in f.attrs.keys():
             metadata[key] = f.attrs[key]
-            
+
         print(f"Loaded predictions from {h5_file_path}")
         print(f"Predictions shape: {predictions.shape}")
         print(f"Binary predictions shape: {binary_predictions.shape}")
         print(f"Targets shape: {targets.shape}")
         print(f"Metadata: {metadata}")
-        
+
         return predictions, binary_predictions, targets, metadata
 
 
 def calculate_deforestation_area(targets):
     """Calculate deforestation area for each target patch.
-    
+
     Args:
         targets: Array of target patches with shape (N, 1, 1, H, W)
-        
+
     Returns:
         np.ndarray: Array of deforestation areas for each patch
     """
@@ -65,47 +66,57 @@ def calculate_deforestation_area(targets):
         deforestation_areas = targets.sum(axis=(1, 2))  # Shape: (N,)
     else:
         raise ValueError(f"Unexpected targets shape: {targets.shape}")
-    
+
     return deforestation_areas
 
 
 def sort_by_deforestation_area(predictions, binary_predictions, targets):
     """Sort patches by deforestation area in descending order.
-    
+
     Args:
         predictions: Raw predictions array
         binary_predictions: Binary predictions array
         targets: Targets array
-        
+
     Returns:
-        tuple: (sorted_predictions, sorted_binary_predictions, 
+        tuple: (sorted_predictions, sorted_binary_predictions,
                 sorted_targets, sorted_indices)
     """
     # Calculate deforestation areas
     deforestation_areas = calculate_deforestation_area(targets)
-    
+
     # Get indices that would sort by deforestation area in descending order
     sorted_indices = np.argsort(deforestation_areas)[::-1]
-    
+
     # Sort all arrays using the indices
     sorted_predictions = predictions[sorted_indices]
     sorted_binary_predictions = binary_predictions[sorted_indices]
     sorted_targets = targets[sorted_indices]
-    
+
     print("Sorted patches by deforestation area (descending):")
     print(
         f"Top 10 deforestation areas: "
         f"{deforestation_areas[sorted_indices[:10]]}"
     )
-    
-    return (sorted_predictions, sorted_binary_predictions,
-            sorted_targets, sorted_indices)
+
+    return (
+        sorted_predictions,
+        sorted_binary_predictions,
+        sorted_targets,
+        sorted_indices,
+    )
 
 
-def plot_patches(predictions, binary_predictions, targets,
-                 sorted_indices=None, patch_indices=None, n_patches=4):
+def plot_patches(
+    predictions,
+    binary_predictions,
+    targets,
+    sorted_indices=None,
+    patch_indices=None,
+    n_patches=4,
+):
     """Plot specified patches or top n patches with highest deforestation area.
-    
+
     Args:
         predictions: Predictions array
         binary_predictions: Binary predictions array
@@ -118,24 +129,25 @@ def plot_patches(predictions, binary_predictions, targets,
     if patch_indices is not None:
         # Use specific patch indices
         n_patches = len(patch_indices)
-        title = f'Selected {n_patches} Patches'
+        title = f"Selected {n_patches} Patches"
     else:
         # Use top n patches by deforestation area
         if sorted_indices is None:
-            raise ValueError("Must provide either patch_indices or " +
-                           "sorted_indices")
-        title = f'Top {n_patches} Patches with Highest Deforestation Area'
-    
+            raise ValueError(
+                "Must provide either patch_indices or " + "sorted_indices"
+            )
+        title = f"Top {n_patches} Patches with Highest Deforestation Area"
+
     # Set color scale maximum
     vmax = 1.0
-    
+
     # Calculate deforestation areas for display
     deforestation_areas = calculate_deforestation_area(targets)
-    
+
     # Create a figure with subplots for each patch
-    fig, axes = plt.subplots(n_patches, 3, figsize=(15, 5*n_patches))
-    fig.suptitle(title, fontsize=16, fontweight='bold')
-    
+    fig, axes = plt.subplots(n_patches, 3, figsize=(15, 5 * n_patches))
+    fig.suptitle(title, fontsize=16, fontweight="bold")
+
     for i in range(n_patches):
         # Get the actual patch index
         if patch_indices is not None:
@@ -144,9 +156,9 @@ def plot_patches(predictions, binary_predictions, targets,
         else:
             patch_idx = sorted_indices[i]
             data_idx = i  # Use sorted order for data access
-            
+
         deforestation_area = deforestation_areas[data_idx]
-        
+
         # Get the data for this patch
         if patch_indices is not None:
             # Use the actual patch index for data access
@@ -158,7 +170,7 @@ def plot_patches(predictions, binary_predictions, targets,
             prediction = predictions[i]
             binary_prediction = binary_predictions[i]
             target = targets[i]
-        
+
         # Handle dimensions - squeeze out single dimensions
         if prediction.ndim == 4:  # (1, 1, H, W)
             prediction = prediction.squeeze()
@@ -168,39 +180,41 @@ def plot_patches(predictions, binary_predictions, targets,
             prediction = prediction.squeeze(0)
             binary_prediction = binary_prediction.squeeze(0)
             target = target.squeeze(0)
-        
+
         # Calculate some statistics
         pred_area = np.sum(binary_prediction)
         target_area = np.sum(target)
         accuracy = np.mean(binary_prediction == target)
-        
+
         # Plot raw prediction
         row = i
-        im1 = axes[row, 0].imshow(prediction, cmap='coolwarm', vmin=0, 
-                                  vmax=vmax)
-        axes[row, 0].set_title(f'Raw Prediction\n(Patch {patch_idx})')
-        axes[row, 0].axis('off')
+        im1 = axes[row, 0].imshow(
+            prediction, cmap="coolwarm", vmin=0, vmax=vmax
+        )
+        axes[row, 0].set_title(f"Raw Prediction\n(Patch {patch_idx})")
+        axes[row, 0].axis("off")
         plt.colorbar(im1, ax=axes[row, 0], fraction=0.046, pad=0.04)
-        
+
         # Plot binary prediction
-        im2 = axes[row, 1].imshow(binary_prediction, cmap='coolwarm',
-                                  vmin=0, vmax=vmax)
+        im2 = axes[row, 1].imshow(
+            binary_prediction, cmap="coolwarm", vmin=0, vmax=vmax
+        )
         axes[row, 1].set_title(
-            f'Binary Prediction\n(Pred Area: {pred_area:.0f})'
+            f"Binary Prediction\n(Pred Area: {pred_area:.0f})"
         )
-        axes[row, 1].axis('off')
+        axes[row, 1].axis("off")
         plt.colorbar(im2, ax=axes[row, 1], fraction=0.046, pad=0.04)
-        
+
         # Plot target
-        im3 = axes[row, 2].imshow(target, cmap='coolwarm', vmin=0, vmax=vmax)
+        im3 = axes[row, 2].imshow(target, cmap="coolwarm", vmin=0, vmax=vmax)
         axes[row, 2].set_title(
-            f'Ground Truth\n(Target Area: {target_area:.0f})'
+            f"Ground Truth\n(Target Area: {target_area:.0f})"
         )
-        axes[row, 2].axis('off')
+        axes[row, 2].axis("off")
         plt.colorbar(im3, ax=axes[row, 2], fraction=0.046, pad=0.04)
-        
+
         # Skip patch info text
-    
+
     plt.tight_layout()
     plt.subplots_adjust(top=0.95)
     plt.show()
@@ -208,20 +222,20 @@ def plot_patches(predictions, binary_predictions, targets,
 
 def main(patch_indices=None):
     """Main function to load predictions and plot sorted patches.
-    
+
     Args:
         patch_indices: List of specific patch indices to plot (e.g., [0, 5, 10, 15])
                       If None, plots top 4 patches by deforestation area
     """
     # Path to predictions file
     predictions_path = "../results/predictions_baseline_w5.h5"
-    
+
     try:
         # Load predictions
         predictions, binary_predictions, targets, metadata = (
             load_predictions_from_h5(predictions_path)
         )
-        
+
         # Debug: Check data statistics
         print("\n=== DATA ANALYSIS ===")
         print(f"Total number of patches: {len(targets)}")
@@ -229,7 +243,7 @@ def main(patch_indices=None):
         print(f"Target shape: {targets.shape}")
         print(f"Target min: {targets.min()}, max: {targets.max()}")
         print(f"Target unique values: {np.unique(targets)}")
-        
+
         # Calculate deforestation areas for all patches
         all_deforestation_areas = calculate_deforestation_area(targets)
         print("\nDeforestation area statistics:")
@@ -237,7 +251,7 @@ def main(patch_indices=None):
         print(f"  Max area: {all_deforestation_areas.max()}")
         print(f"  Mean area: {all_deforestation_areas.mean():.2f}")
         print(f"  Median area: {np.median(all_deforestation_areas):.2f}")
-        
+
         # Check distribution of deforestation areas
         zero_patches = np.sum(all_deforestation_areas == 0)
         full_patches = np.sum(all_deforestation_areas == targets[0].size)
@@ -245,24 +259,28 @@ def main(patch_indices=None):
         print(f"  Patches with full deforestation: {full_patches}")
         partial_patches = len(targets) - zero_patches - full_patches
         print(f"  Patches with partial deforestation: {partial_patches}")
-        
+
         # Show top 10 deforestation areas
         sorted_areas = np.sort(all_deforestation_areas)[::-1]
         print(f"\nTop 10 highest deforestation areas: {sorted_areas[:10]}")
         print(f"Bottom 10 lowest deforestation areas: {sorted_areas[-10:]}")
-        
+
         # Sort by deforestation area
-        (sorted_predictions, sorted_binary_predictions,
-         sorted_targets, sorted_indices) = sort_by_deforestation_area(
+        (
+            sorted_predictions,
+            sorted_binary_predictions,
+            sorted_targets,
+            sorted_indices,
+        ) = sort_by_deforestation_area(
             predictions, binary_predictions, targets
         )
-        
+
         # Print top sorted patch indices
         print("\nTop 20 patch indices (sorted by deforestation area):")
         print(f"Indices: {sorted_indices[:20].tolist()}")
         print(f"Top 10: {sorted_indices[:10].tolist()}")
         print(f"Top 4: {sorted_indices[:4].tolist()}")
-        
+
         # Debug: Check individual patch statistics
         print("\n=== TOP 4 PATCHES ANALYSIS ===")
         for i in range(4):
@@ -270,32 +288,39 @@ def main(patch_indices=None):
             target_patch = sorted_targets[i]
             if target_patch.ndim > 2:
                 target_patch = target_patch.squeeze()
-            
+
             print(f"Patch {patch_idx}:")
             print(f"  Target shape: {target_patch.shape}")
             print(f"  Target unique values: {np.unique(target_patch)}")
             print(f"  Target mean: {target_patch.mean():.4f}")
             print(f"  Non-zero pixels: {np.sum(target_patch > 0)}")
             print(f"  Total pixels: {target_patch.size}")
-        
+
         # Plot patches (either specific indices or top 4)
         if patch_indices is not None:
             # Plot specific patches
             plot_patches(
-                predictions, binary_predictions, targets,
-                patch_indices=patch_indices
+                predictions,
+                binary_predictions,
+                targets,
+                patch_indices=patch_indices,
             )
         else:
             # Plot top 4 patches by deforestation area
             plot_patches(
-                sorted_predictions, sorted_binary_predictions, sorted_targets,
-                sorted_indices=sorted_indices, n_patches=4
+                sorted_predictions,
+                sorted_binary_predictions,
+                sorted_targets,
+                sorted_indices=sorted_indices,
+                n_patches=4,
             )
-        
+
     except FileNotFoundError as e:
         print(f"Error: {e}")
-        print("Please make sure you have trained the model first by "
-              "running: python main.py")
+        print(
+            "Please make sure you have trained the model first by "
+            "running: python main.py"
+        )
     except Exception as e:
         print(f"An error occurred: {e}")
         raise

@@ -43,20 +43,20 @@ class WeightedBCEWithLogitsLoss(torch.nn.Module):
         target: torch.Tensor,
     ) -> torch.Tensor:
         """
-        Compute the weighted binary cross entropy with logits loss.
+         Compute the weighted binary cross entropy with logits loss.
 
-        Args:
-            input: Predicted logits tensor (batch_size, ...).
-                  Raw, unnormalized predictions from the model.
-            target: Ground truth binary labels tensor of shape
-                   (batch_size, ...). Should contain values in [0, 1].
+         Args:
+             input: Predicted logits tensor (batch_size, ...).
+                   Raw, unnormalized predictions from the model.
+             target: Ground truth binary labels tensor of shape
+                    (batch_size, ...). Should contain values in [0, 1].
 
-       Returns:
-            torch.Tensor: Computed weighted binary cross entropy loss scalar.
-                         Uses self.weight for valid targets (target > 0) and
-                         self.invalid_weight for invalid targets (target <= 0).
-                         If pos_weight is specified, also applies class-level
-                         weighting for positive examples.
+        Returns:
+             torch.Tensor: Computed weighted binary cross entropy loss scalar.
+                          Uses self.weight for valid targets (target > 0) and
+                          self.invalid_weight for invalid targets (target <= 0).
+                          If pos_weight is specified, also applies class-level
+                          weighting for positive examples.
         """
         # compute validity mask
         validity_mask = (target > 0.0).float()

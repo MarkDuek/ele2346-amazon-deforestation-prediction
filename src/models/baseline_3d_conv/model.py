@@ -7,10 +7,7 @@ class SimpleBaselineB(nn.Module):
         super().__init__()
         # kernel size = (T,1,1) so the conv itself collapses the time axis
         self.conv = nn.Conv3d(
-            in_channels,
-            1,
-            kernel_size=(time_steps, 1, 1),
-            padding=(0, 0, 0)
+            in_channels, 1, kernel_size=(time_steps, 1, 1), padding=(0, 0, 0)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

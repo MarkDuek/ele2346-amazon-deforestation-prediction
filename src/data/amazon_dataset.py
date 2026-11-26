@@ -1,13 +1,12 @@
 """Amazon deforestation dataset implementation for PyTorch."""
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import h5py
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from typing_extensions import Callable
 
 
 class AmazonDataset(Dataset):
@@ -58,10 +57,10 @@ class AmazonDataset(Dataset):
         """
         base_idx = self.valid_indices[idx]
 
-
         # Compute sequence indices
         seq_indices = [
-            base_idx + i * self.num_patches_per_time for i in range(self.time_slice)
+            base_idx + i * self.num_patches_per_time
+            for i in range(self.time_slice)
         ]
 
         # Check bounds against actual HDF5 dataset size
@@ -86,10 +85,6 @@ class AmazonDataset(Dataset):
 
         target_tensor = sequence_tensor[-1, 1, :, :].unsqueeze(0).unsqueeze(0)
         target_tensor = (target_tensor > 0.0).to(dtype=torch.float32)
-        # pos_ratio = (target_tensor > 0.5).float().mean().item()
-        # print(f"Positive pixel ratio: {pos_ratio:.4f}")
-
-
         if self.transform:
             # (C, time_slice-1, H, W)
             input_tensor = self.transform(input_tensor)
@@ -100,10 +95,15 @@ class AmazonDataset(Dataset):
     def __find_valid_indices(self) -> None:
         """Get valid indices for the dataset."""
         max_time_index = self.time_indices[-1]
-        max_idx = self.num_patches_per_time * (max_time_index - self.time_slice + 1)
+        max_idx = self.num_patches_per_time * (
+            max_time_index - self.time_slice + 1
+        )
 
         for idx in range(max_idx):
-            seq_indices = [idx + i * self.num_patches_per_time for i in range(self.time_slice)]
+            seq_indices = [
+                idx + i * self.num_patches_per_time
+                for i in range(self.time_slice)
+            ]
             target_idx = seq_indices[-1]
             if target_idx >= self.input_h5["patches"].shape[0]:
                 continue

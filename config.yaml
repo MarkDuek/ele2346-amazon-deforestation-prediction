@@ -43,6 +43,4 @@ save_paths:
   early_stopping: "checkpoints/early_stopping.pt"
   model: "checkpoints/trained_model.pth"
   plot: "plots/training_curves.png"
-  history: "results/training_history.json"
-  results: "results/evaluation_results.json"
   predictions: "results/predictions_5.h5"

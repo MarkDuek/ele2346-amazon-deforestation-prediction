@@ -1,6 +1,9 @@
-import torch
 from typing import Any, Dict
+
+import torch
+
 from .softiou import SoftIoULoss
+
 
 class WeightedBCEWithLogitsAndIoULoss(torch.nn.Module):
     def __init__(self, config: Dict[str, Any]):
@@ -12,9 +15,13 @@ class WeightedBCEWithLogitsAndIoULoss(torch.nn.Module):
 
         self.soft_iou = SoftIoULoss()
 
-    def forward(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, input: torch.Tensor, target: torch.Tensor
+    ) -> torch.Tensor:
         validity_mask = (target > 0.0).float()
-        weights = torch.where(validity_mask == 1, self.weight, self.invalid_weight)
+        weights = torch.where(
+            validity_mask == 1, self.weight, self.invalid_weight
+        )
 
         pos_weight = None
         if self.pos_weight is not None:

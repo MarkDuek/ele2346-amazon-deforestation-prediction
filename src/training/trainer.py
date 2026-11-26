@@ -3,17 +3,19 @@
 import logging
 import time
 from typing import Any, Dict, List, Tuple
-from torchmetrics import Accuracy, Precision, Recall, F1Score, JaccardIndex
 
 import h5py
 import numpy as np
 import torch
+from torchmetrics import Accuracy, F1Score, JaccardIndex, Precision, Recall
 from tqdm import tqdm
 
 from src.training.early_stopping import EarlyStopping
-from src.utils.utils import (export_memory_snapshot,
-                             start_record_memory_history,
-                             stop_record_memory_history)
+from src.utils.utils import (
+    export_memory_snapshot,
+    start_record_memory_history,
+    stop_record_memory_history,
+)
 
 
 class Trainer:
@@ -115,7 +117,6 @@ class Trainer:
         # Training start time
         training_start_time = time.time()
 
-
         # data, target = self.batch
 
         for epoch in range(epochs):
@@ -139,7 +140,7 @@ class Trainer:
             )
 
             for data, target in train_pbar:
-            # for step in range(1000):
+                # for step in range(1000):
                 # move data to device
                 data, target = data.to(self.device), target.to(self.device)
 
@@ -151,7 +152,7 @@ class Trainer:
                 self.optimizer.zero_grad()
                 # forward pass
                 train_output: torch.Tensor = self.model(data)
-                
+
                 # print("Input (logits) min/max:", data.min().item(), data.max().item())
                 # print("Target min/max:", target.min().item(), target.max().item())
 
@@ -178,17 +179,19 @@ class Trainer:
 
                 # Update progress bar with current loss
                 train_pbar.set_postfix(
-                    {"loss": f"{train_loss_tensor.item():.4f}",
-                     "accuracy": f"{accuracy.compute():.4f}",
-                     "precision": f"{precision.compute():.4f}",
-                     "recall": f"{recall.compute():.4f}",
-                     "f1": f"{f1.compute():.4f}",
-                     "iou": f"{iou.compute():.4f}"}
+                    {
+                        "loss": f"{train_loss_tensor.item():.4f}",
+                        "accuracy": f"{accuracy.compute():.4f}",
+                        "precision": f"{precision.compute():.4f}",
+                        "recall": f"{recall.compute():.4f}",
+                        "f1": f"{f1.compute():.4f}",
+                        "iou": f"{iou.compute():.4f}",
+                    }
                 )
 
                 # if step%50 == 0:
                 #     print(f"step {step}, loss {train_loss_tensor.item()}")
-            
+
             accuracy.reset()
             precision.reset()
             recall.reset()
@@ -232,12 +235,14 @@ class Trainer:
 
                     # Update progress bar with current loss
                     val_pbar.set_postfix(
-                        {"loss": f"{val_loss_tensor.item():.4f}",
-                         "accuracy": f"{accuracy.compute():.4f}",
-                         "precision": f"{precision.compute():.4f}",
-                         "recall": f"{recall.compute():.4f}",
-                         "f1": f"{f1.compute():.4f}",
-                         "iou": f"{iou.compute():.4f}"}
+                        {
+                            "loss": f"{val_loss_tensor.item():.4f}",
+                            "accuracy": f"{accuracy.compute():.4f}",
+                            "precision": f"{precision.compute():.4f}",
+                            "recall": f"{recall.compute():.4f}",
+                            "f1": f"{f1.compute():.4f}",
+                            "iou": f"{iou.compute():.4f}",
+                        }
                     )
 
             accuracy.reset()
@@ -283,8 +288,7 @@ class Trainer:
 
             # save model
             torch.save(
-                self.model.state_dict(), 
-                self.config["save_paths"]["model"]
+                self.model.state_dict(), self.config["save_paths"]["model"]
             )
 
         if self.config["memory_record"]["enabled"]:
@@ -294,7 +298,7 @@ class Trainer:
         return self.model, avg_train_loss, avg_val_loss
 
     def evaluate(
-        self, 
+        self,
         trained_model: torch.nn.Module,
         data_loader: torch.utils.data.DataLoader,
     ) -> Dict[str, float]:
@@ -311,15 +315,15 @@ class Trainer:
 
         # Set model to evaluation mode
         self.model.eval()
-        
+
         total_loss = 0.0
         num_batches = 0
-        
+
         # Lists to collect predictions and targets for saving
         all_predictions = []
         all_binary_predictions = []
         all_targets = []
-        
+
         # Progress bar for evaluation
         eval_pbar = tqdm(
             data_loader,
@@ -327,7 +331,7 @@ class Trainer:
             unit="batch",
             leave=False,
         )
-        
+
         accuracy = Accuracy(task="binary").to(self.device)
         precision = Precision(task="binary").to(self.device)
         recall = Recall(task="binary").to(self.device)
@@ -338,10 +342,10 @@ class Trainer:
             for data, target in eval_pbar:
                 # Move data to device
                 data, target = data.to(self.device), target.to(self.device)
-                
+
                 # Forward pass
                 output = self.model(data)
-                
+
                 # Compute loss
                 loss = self.loss_fn(output, target)
                 total_loss += loss.item()
@@ -349,30 +353,32 @@ class Trainer:
                 # compute metrics
                 pred = (output > self.threshold).int()
                 targ = (target > self.threshold).int()
-                
+
                 # Collect predictions and targets for saving
                 all_predictions.append(output.cpu().numpy())
                 all_binary_predictions.append(pred.cpu().numpy())
                 all_targets.append(target.cpu().numpy())
-                
+
                 accuracy(pred, targ)
                 precision(pred, targ)
                 recall(pred, targ)
                 f1(pred, targ)
                 iou(pred, targ)
-                
+
                 # Update progress bar
-                eval_pbar.set_postfix({
-                    "loss": f"{loss.item():.4f}",
-                    "accuracy": f"{accuracy.compute():.4f}",
-                    "precision": f"{precision.compute():.4f}",
-                    "recall": f"{recall.compute():.4f}",
-                    "f1": f"{f1.compute():.4f}",
-                    "iou": f"{iou.compute():.4f}"
-                })
-                
+                eval_pbar.set_postfix(
+                    {
+                        "loss": f"{loss.item():.4f}",
+                        "accuracy": f"{accuracy.compute():.4f}",
+                        "precision": f"{precision.compute():.4f}",
+                        "recall": f"{recall.compute():.4f}",
+                        "f1": f"{f1.compute():.4f}",
+                        "iou": f"{iou.compute():.4f}",
+                    }
+                )
+
                 num_batches += 1
-        
+
         # Compute average metrics
         avg_metrics = {}
         avg_metrics["accuracy"] = accuracy.compute()
@@ -383,33 +389,33 @@ class Trainer:
         avg_metrics["avg_loss"] = (
             total_loss / num_batches if num_batches > 0 else 0.0
         )
-        
+
         # Save predictions to h5 file
         predictions_path = self.config["save_paths"]["predictions"]
         self.logger.info("Saving predictions to %s", predictions_path)
-        
+
         # Convert lists to numpy arrays
         predictions_array = np.concatenate(all_predictions, axis=0)
         binary_predictions_array = np.concatenate(
             all_binary_predictions, axis=0
         )
         targets_array = np.concatenate(all_targets, axis=0)
-        
+
         # Save to h5 file
-        with h5py.File(predictions_path, 'w') as f:
-            f.create_dataset('predictions', data=predictions_array)
+        with h5py.File(predictions_path, "w") as f:
+            f.create_dataset("predictions", data=predictions_array)
             f.create_dataset(
-                'binary_predictions', data=binary_predictions_array
+                "binary_predictions", data=binary_predictions_array
             )
-            f.create_dataset('targets', data=targets_array)
-            
+            f.create_dataset("targets", data=targets_array)
+
             # Save metadata
-            f.attrs['threshold'] = self.threshold
-            f.attrs['num_batches'] = num_batches
-            f.attrs['total_samples'] = len(predictions_array)
-        
+            f.attrs["threshold"] = self.threshold
+            f.attrs["num_batches"] = num_batches
+            f.attrs["total_samples"] = len(predictions_array)
+
         self.logger.info("Predictions saved successfully!")
-        
+
         # Log results
         self.logger.info("Evaluation Results:")
         self.logger.info("  Average Loss: %.4f", avg_metrics["avg_loss"])
@@ -418,5 +424,5 @@ class Trainer:
         self.logger.info("  Recall: %.4f", avg_metrics["recall"])
         self.logger.info("  F1 Score: %.4f", avg_metrics["f1"])
         self.logger.info("  IoU: %.4f", avg_metrics["iou"])
-        
+
         return avg_metrics

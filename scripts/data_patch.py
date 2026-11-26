@@ -10,9 +10,14 @@ import torch
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.utils.data_utils import (concatenate_sparse_matrix, get_patch,
-                                  get_time_slice, inspect_h5_file,
-                                  load_npz_files, pad_to_multiple)
+from src.utils.data_utils import (
+    concatenate_sparse_matrix,
+    get_patch,
+    get_time_slice,
+    inspect_h5_file,
+    load_npz_files,
+    pad_to_multiple,
+)
 from src.utils.utils import load_config
 
 # Configure logging
@@ -46,11 +51,11 @@ for i in range(total_time_steps):
     input_data = torch.tensor(concatenated_data[:, 0, :, :]).float()
 
     channel_sums += input_data.sum(dim=(1, 2))
-    channel_sq_sums += (input_data ** 2).sum(dim=(1, 2))
+    channel_sq_sums += (input_data**2).sum(dim=(1, 2))
     pixel_counts += input_data.shape[1] * input_data.shape[2]
 
 channel_means = channel_sums / pixel_counts
-channel_stds = (channel_sq_sums / pixel_counts - channel_means ** 2).sqrt()
+channel_stds = (channel_sq_sums / pixel_counts - channel_means**2).sqrt()
 channel_stds = channel_stds.clamp(min=1e-2)
 
 logger.info(f"Channel means: {channel_means}")
@@ -94,7 +99,9 @@ for i in range(total_time_steps):
     #     input_data[c] = (input_data[c] - channel_means[c]) / channel_stds[c].clamp(min=eps)
 
     c = 2
-    input_data[c] = (input_data[c] - channel_means[c]) / channel_stds[c].clamp(min=eps)
+    input_data[c] = (input_data[c] - channel_means[c]) / channel_stds[c].clamp(
+        min=eps
+    )
 
     input_data = input_data.clamp(min=-5.0, max=5.0)
 
