@@ -4,6 +4,7 @@ import torch
 from src.utils.utils import get_device, load_config, parse_args
 
 
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
 def test_get_device(device):
     result = get_device(device)
 
